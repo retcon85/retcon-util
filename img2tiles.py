@@ -78,9 +78,9 @@ def print_asm(tiles, palette):
     print("; palette")
     for i in range(SMS_PALETTE_SIZE):
         if i < len(palette):
-            print('db ${:02x}; color {:02x}'.format(palette[i], i))
+            print('.db ${:02x}; color {:02x}'.format(palette[i], i))
         else:
-            print('db $00; color {:02x} (undefined)'.format(i))
+            print('.db $00; color {:02x} (undefined)'.format(i))
         
     print()
     for i, tile in enumerate(tiles):
@@ -92,7 +92,7 @@ def print_asm(tiles, palette):
                 for px in row:
                     byte = (byte << 1) + ((px >> p) & 1)
                 row_bytes.append('${:02x}'.format(byte))
-            print(f"db {','.join(row_bytes)}")
+            print(f".db {','.join(row_bytes)}")
 
 (tiles, palette) = read_bmp(args.file)
 print_asm(tiles, palette)
