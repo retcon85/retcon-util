@@ -94,5 +94,42 @@ def print_asm(tiles, palette):
                 row_bytes.append('${:02x}'.format(byte))
             print(f".db {','.join(row_bytes)}")
 
+def print_c(tiles, palette):
+    bg_colors = []
+    sprite_colors = []
+    for i in range(SMS_PALETTE_SIZE):
+        if i < len(palette):
+            color = palette[i]
+        else:
+            color = 0
+        if i < 16:
+            bg_colors.append('0x{:02x}'.format(color))
+        else:
+            sprite_colors.append('0x{:02x}'.format(color))
+    print("const unsigned char bg_colors[] = {")
+    print(f"  {', '.join(bg_colors)}")
+    print("};")
+    print("const unsigned char sprite_colors[] = {")
+    print(f"  {', '.join(sprite_colors)}")
+    print("};")
+        
+    print()
+    print("const unsigned char all_tiles[][32] = {")
+    all_bytes = []
+    for i, tile in enumerate(tiles):
+        tile_bytes = []
+        for row in tile:
+            for p in range(4):
+                byte = 0
+                for px in row:
+                    byte = (byte << 1) + ((px >> p) & 1)
+                tile_bytes.append('0x{:02x}'.format(byte))
+        all_bytes.append(f"  {{ {', '.join(tile_bytes)} }}")
+    print(',\n'.join(all_bytes))
+    print("};")
+
 (tiles, palette) = read_bmp(args.file)
-print_asm(tiles, palette)
+if args.output == "asm":
+    print_asm(tiles, palette)
+else:
+    print_c(tiles, palette)
