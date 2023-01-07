@@ -11,8 +11,9 @@ SMS_TILE_SIZE = 8
 
 parser = argparse.ArgumentParser(description='Convert bitmap file to tile data.')
 parser.add_argument('file', nargs='?', type=argparse.FileType('rb'), default=sys.stdin, help='the bitmap (.bmp or .tga) file to process')
-parser.add_argument('-o', '--output', choices=['asm', 'c'], default='asm', help='the output type, z80 assembler or C')
-parser.add_argument('-c', '--colors', action=argparse.BooleanOptionalAction, default=True, help='output the color table (palette)')
+parser.add_argument('-o', '--output', choices=['asm', 'c', 'bin'], default='asm', help='the output type, z80 assembler, C or raw binary')
+parser.add_argument('-p', '--palette', action=argparse.BooleanOptionalAction, default=True, help='output the palette')
+parser.add_argument('-t', '--tiles', action=argparse.BooleanOptionalAction, default=True, help='output the tiles')
 
 args = parser.parse_args()
 
@@ -75,61 +76,88 @@ def read_bmp(file):
     return (tiles, palette)
 
 def print_asm(tiles, palette):
-    print("; palette")
-    for i in range(SMS_PALETTE_SIZE):
-        if i < len(palette):
-            print('.db ${:02x}; color {:02x}'.format(palette[i], i))
-        else:
-            print('.db $00; color {:02x} (undefined)'.format(i))
-        
-    print()
-    for i, tile in enumerate(tiles):
-        print(f"; tile {i}")
-        for row in tile:
-            row_bytes = []
-            for p in range(4):
-                byte = 0
-                for px in row:
-                    byte = (byte << 1) + ((px >> p) & 1)
-                row_bytes.append('${:02x}'.format(byte))
-            print(f".db {','.join(row_bytes)}")
+    if args.palette:
+        print("; palette")
+        for i in range(SMS_PALETTE_SIZE):
+            if i < len(palette):
+                print('.db ${:02x}; color {:02x}'.format(palette[i], i))
+            else:
+                print('.db $00; color {:02x} (undefined)'.format(i))
+            
+        if args.tiles:
+            print()
+
+    if args.tiles:
+        for i, tile in enumerate(tiles):
+            print(f"; tile {i}")
+            for row in tile:
+                row_bytes = []
+                for p in range(4):
+                    byte = 0
+                    for px in row:
+                        byte = (byte << 1) + ((px >> p) & 1)
+                    row_bytes.append('${:02x}'.format(byte))
+                print(f".db {','.join(row_bytes)}")
 
 def print_c(tiles, palette):
-    bg_colors = []
-    sprite_colors = []
-    for i in range(SMS_PALETTE_SIZE):
-        if i < len(palette):
-            color = palette[i]
-        else:
-            color = 0
-        if i < 16:
-            bg_colors.append('0x{:02x}'.format(color))
-        else:
-            sprite_colors.append('0x{:02x}'.format(color))
-    print("const unsigned char bg_colors[] = {")
-    print(f"  {', '.join(bg_colors)}")
-    print("};")
-    print("const unsigned char sprite_colors[] = {")
-    print(f"  {', '.join(sprite_colors)}")
-    print("};")
+    if args.palette:
+        bg_colors = []
+        sprite_colors = []
+        for i in range(SMS_PALETTE_SIZE):
+            if i < len(palette):
+                color = palette[i]
+            else:
+                color = 0
+            if i < 16:
+                bg_colors.append('0x{:02x}'.format(color))
+            else:
+                sprite_colors.append('0x{:02x}'.format(color))
+        print("const unsigned char bg_colors[] = {")
+        print(f"  {', '.join(bg_colors)}")
+        print("};")
+        print("const unsigned char sprite_colors[] = {")
+        print(f"  {', '.join(sprite_colors)}")
+        print("};")
         
-    print()
-    print("const unsigned char all_tiles[][32] = {")
-    all_bytes = []
-    for i, tile in enumerate(tiles):
-        tile_bytes = []
-        for row in tile:
-            for p in range(4):
-                byte = 0
-                for px in row:
-                    byte = (byte << 1) + ((px >> p) & 1)
-                tile_bytes.append('0x{:02x}'.format(byte))
-        all_bytes.append(f"  {{ {', '.join(tile_bytes)} }}")
-    print(',\n'.join(all_bytes))
-    print("};")
+        if args.tiles:        
+            print()
+
+    if args.tiles:        
+        print("const unsigned char all_tiles[][32] = {")
+        all_bytes = []
+        for i, tile in enumerate(tiles):
+            tile_bytes = []
+            for row in tile:
+                for p in range(4):
+                    byte = 0
+                    for px in row:
+                        byte = (byte << 1) + ((px >> p) & 1)
+                    tile_bytes.append('0x{:02x}'.format(byte))
+            all_bytes.append(f"  {{ {', '.join(tile_bytes)} }}")
+        print(',\n'.join(all_bytes))
+        print("};")
+
+def print_bin(tiles, palette):
+    if args.palette:
+        for i in range(SMS_PALETTE_SIZE):
+            if i < len(palette):
+                sys.stdout.buffer.write(palette[i].to_bytes(1, byteorder="little"))
+            else:
+                sys.stdout.buffer.write(0)
+
+    if args.tiles:        
+        for i, tile in enumerate(tiles):
+            for row in tile:
+                for p in range(4):
+                    byte = 0
+                    for px in row:
+                        byte = (byte << 1) + ((px >> p) & 1)
+                    sys.stdout.buffer.write(byte.to_bytes(1, byteorder="little"))
 
 (tiles, palette) = read_bmp(args.file)
 if args.output == "asm":
     print_asm(tiles, palette)
+elif args.output == "bin":
+    print_bin(tiles, palette)
 else:
     print_c(tiles, palette)
