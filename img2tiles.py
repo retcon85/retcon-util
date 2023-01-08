@@ -143,7 +143,7 @@ def print_bin(tiles, palette):
             if i < len(palette):
                 sys.stdout.buffer.write(palette[i].to_bytes(1, byteorder="little"))
             else:
-                sys.stdout.buffer.write(0)
+                sys.stdout.buffer.write(bytes([0]))
 
     if args.tiles:        
         for i, tile in enumerate(tiles):
